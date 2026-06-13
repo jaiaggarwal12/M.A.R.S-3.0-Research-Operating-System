@@ -15,18 +15,18 @@ def get_p():
     return _pipeline
 
 def run_full(query, run_exps, twin, progress=gr.Progress()):
-    if not query.strip(): return ("Enter a query.","","","","","","","")
+    if not query.strip():
+        return ("❌ Please enter a research query.","","","","","","","❌ Please enter a research query.")
     try:
-        progress(0.05, desc="Starting M.A.R.S 4.0...")
+        progress(0.05, desc="🔬 Initializing pipeline...")
         p = get_p()
-        progress(0.10, desc="Fetching papers...")
+        progress(0.15, desc="📡 Fetching papers from arxiv (takes 2-3 min)...")
         result = p.run(query, run_experiments=run_exps, twin_persona=twin)
-        progress(1.0, desc="Done!")
+        progress(1.0, desc="✅ Done!")
         bench = metrics.snapshot()
         report = result.get("final_report","")
-        gaps_md = "\n".join(f"- {g}" for g in result.get("research_gaps",[])) or "None"
-        
-        # Arena leaderboard markdown
+        gaps_md = "\n".join(f"- {g}" for g in result.get("research_gaps",[])) or "None found"
+
         arena_md = ""
         for h in result.get("arena_ranked",[])[:8]:
             src = "🔗" if h.get("source")=="cross_paper_synthesis" else "📄"
@@ -34,8 +34,7 @@ def run_full(query, run_exps, twin, progress=gr.Progress()):
                         f"— Score: **{h.get('scientist_score',0):.1f}** "
                         f"| N:{h.get('novelty_score',0)}/10 F:{h.get('feasibility_score',0)}/10 I:{h.get('expected_impact',0)}/10\n"
                         f"  _{h.get('one_line_pitch','')}_\n\n")
-        
-        # Cross-paper
+
         cp_md = ""
         for c in result.get("cross_paper_combinations",[])[:3]:
             a = c.get("component_a",{}); b = c.get("component_b",{})
@@ -43,20 +42,23 @@ def run_full(query, run_exps, twin, progress=gr.Progress()):
                      f"`{a.get('component_type','')}` from _{a.get('paper_title','')}_: `{a.get('component','')}`\n"
                      f"+ `{b.get('component_type','')}` from _{b.get('paper_title','')}_: `{b.get('component','')}`\n"
                      f"Rationale: {c.get('combination_rationale','')}\n\n")
-        
-        # Exp results
+
         exp_md = ""
         for a in result.get("analysis",{}).get("analyses",[]):
             ve = {"confirmed":"✅","rejected":"❌","partial":"⚠️"}.get(a.get("hypothesis_verdict",""),"❓")
             exp_md += f"{ve} **{a.get('title','')}** — {a.get('key_finding','')}\n\n"
-        
+
         bench_md = "| Metric | Value |\n|--------|-------|\n" + "\n".join(
             f"| {k.replace('_',' ').title()} | {v} |" for k,v in bench.items())
-        
-        return report, gaps_md, arena_md or "Run query first", cp_md or "No cross-paper combinations", exp_md or "No experiments", bench_md, "", ""
+
+        papers_n = result.get("papers_count", 0)
+        latency  = result.get("latency_sec", 0)
+        status = f"✅ Done! Processed {papers_n} papers in {latency}s"
+        return report, gaps_md, arena_md or "No hypotheses yet", cp_md or "No cross-paper combinations", exp_md or "No experiments run", bench_md, "", status
     except Exception as exc:
         logger.exception(str(exc))
-        return f"Error: {exc}","","","","","","",""
+        err = f"❌ Error: {exc}"
+        return err,"","","","","","",err
 
 def get_graph_viz():
     try:
@@ -221,20 +223,22 @@ Ingest → Graph → Memory → Literature → **Cross-Paper Synthesis** → Hyp
                 twin_sel = gr.Dropdown(choices=["Andrej Karpathy","Andrew Ng","Yann LeCun"],
                     value="Andrej Karpathy", label="Twin", scale=1)
                 run_btn = gr.Button("🚀 Run", variant="primary", scale=1)
+            # Always-visible status bar
+            status_out = gr.Textbox(
+                value="Ready — enter a query and click Run. First run takes 3–5 minutes.",
+                label="⏱ Status", interactive=False)
             with gr.Row():
-                with gr.Column(scale=3): report_out = gr.Markdown(label="Report")
+                with gr.Column(scale=3): report_out = gr.Markdown(label="📄 Report")
                 with gr.Column(scale=1):
-                    bench_out = gr.Markdown(label="Benchmarks")
-                    gaps_out = gr.Markdown(label="Gaps")
+                    bench_out = gr.Markdown(label="📊 Benchmarks")
+                    gaps_out = gr.Markdown(label="🔍 Research Gaps")
             with gr.Row():
-                arena_out = gr.Markdown(label="Arena Top")
-                cp_out = gr.Markdown(label="Cross-Paper")
-            with gr.Row():
-                exp_out = gr.Markdown(label="Experiments")
-                err_out = gr.Markdown(visible=False)
-            twin_out = gr.Markdown(label="Twin", visible=False)
-            run_btn.click(fn=run_full, inputs=[q1,run_exps,twin_sel],
-                outputs=[report_out,gaps_out,arena_out,cp_out,exp_out,bench_out,twin_out,err_out])
+                arena_out = gr.Markdown(label="🏆 Arena Top Hypotheses")
+                cp_out = gr.Markdown(label="🔗 Cross-Paper Combos")
+            exp_out = gr.Markdown(label="🧪 Experiments")
+            twin_out = gr.Markdown(label="🤖 Twin", visible=False)
+            run_btn.click(fn=run_full, inputs=[q1, run_exps, twin_sel],
+                outputs=[report_out, gaps_out, arena_out, cp_out, exp_out, bench_out, twin_out, status_out])
 
         with gr.TabItem("🕸️ Citation Graph"):
             gr.Markdown("*Node size = citations. Color = publication year.*")
@@ -273,7 +277,8 @@ Ingest → Graph → Memory → Literature → **Cross-Paper Synthesis** → Hyp
         with gr.TabItem("📊 Dashboard"):
             gr.Button("Refresh Dashboard").click(fn=get_dashboard, outputs=[gr.Markdown()])
 
-    gr.Markdown("---\n*M.A.R.S 4.0 — Research Operating System*")
+    gr.Markdown("---\n*M.A.R.S 4.0 — Research Operating System | Powered by Groq + Llama 3.3 70B*")
 
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7860, share=False)
+    port = int(os.environ.get("PORT", 7860))
+    demo.launch(server_name="0.0.0.0", server_port=port, share=False)
