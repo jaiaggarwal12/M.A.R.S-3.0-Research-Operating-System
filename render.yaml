@@ -25,9 +25,11 @@ services:
       - key: NEO4J_URI
         sync: false        # set in Render dashboard
       - key: NEO4J_USER
-        value: neo4j
+        value: b9cde491
       - key: NEO4J_PASSWORD
         sync: false        # set in Render dashboard
+      - key: NEO4J_DATABASE
+        value: b9cde491
       - key: FAISS_INDEX_PATH
         value: /app/data/faiss_index
       - key: EMBEDDING_MODEL
@@ -81,9 +83,11 @@ services:
       - key: NEO4J_URI
         sync: false
       - key: NEO4J_USER
-        value: neo4j
+        value: b9cde491
       - key: NEO4J_PASSWORD
         sync: false
+      - key: NEO4J_DATABASE
+        value: b9cde491
       - key: FAISS_INDEX_PATH
         value: /app/data/faiss_index
       - key: EMBEDDING_MODEL

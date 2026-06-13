@@ -23,8 +23,9 @@ TEMPERATURE: float       = float(os.getenv("TEMPERATURE", "0.1"))
 
 # Neo4j
 NEO4J_URI: str      = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-NEO4J_USER: str     = os.getenv("NEO4J_USER", "neo4j")
+NEO4J_USER: str     = os.getenv("NEO4J_USER", os.getenv("NEO4J_USERNAME", "neo4j"))
 NEO4J_PASSWORD: str = os.getenv("NEO4J_PASSWORD", "password")
+NEO4J_DATABASE: str = os.getenv("NEO4J_DATABASE", "neo4j")
 
 # Vector
 FAISS_INDEX_PATH: str = os.getenv("FAISS_INDEX_PATH", str(DATA_DIR/"faiss_index"))

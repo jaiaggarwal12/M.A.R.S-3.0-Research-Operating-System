@@ -21,11 +21,13 @@ class KnowledgeGraphBuilder:
             try:
                 self._driver = GraphDatabase.driver(config.NEO4J_URI, auth=(config.NEO4J_USER, config.NEO4J_PASSWORD))
                 self._driver.verify_connectivity()
+                self._db = config.NEO4J_DATABASE
                 self._init_schema()
-                logger.info("KnowledgeGraph: Neo4j connected")
+                logger.info(f"KnowledgeGraph: Neo4j Aura connected (db={self._db})")
             except Exception as exc:
                 logger.warning(f"KnowledgeGraph: NetworkX fallback ({exc})")
                 self._driver = None
+                self._db = "neo4j"
 
     def ingest_papers(self, papers: List[PaperRecord]) -> Dict:
         for p in papers:
@@ -36,7 +38,7 @@ class KnowledgeGraphBuilder:
             for ref in p.references:
                 if ref: self._nx.add_edge(p.arxiv_id, ref, rel="CITES")
         if self._driver:
-            with self._driver.session() as s:
+            with self._driver.session(database=self._db) as s:
                 for p in papers: s.execute_write(self._upsert_tx, p)
         stats = self._stats()
         metrics.inc("graph_nodes", stats["nodes"])
@@ -127,7 +129,7 @@ class KnowledgeGraphBuilder:
             id=p.arxiv_id,t=p.title,a=p.abstract,pub=p.published,c=p.citation_count)
 
     def _init_schema(self):
-        with self._driver.session() as s:
+        with self._driver.session(database=self._db) as s:
             for q in ["CREATE CONSTRAINT paper_id IF NOT EXISTS FOR (p:Paper) REQUIRE p.arxiv_id IS UNIQUE"]:
                 try: s.run(q)
                 except: pass
