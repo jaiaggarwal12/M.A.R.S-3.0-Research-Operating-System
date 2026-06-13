@@ -11,6 +11,10 @@ DATA_DIR = BASE_DIR / "data"
 for _d in ["logs","faiss_index","experiments","papers","reports","memory","twin_papers"]:
     (DATA_DIR / _d).mkdir(parents=True, exist_ok=True)
 
+# Groq
+GROQ_API_KEY: str  = os.getenv("GROQ_API_KEY", "")
+GROQ_MODEL: str    = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+
 # LLM
 LLM_PROVIDER: str        = os.getenv("LLM_PROVIDER", "openai")
 OPENAI_API_KEY: str      = os.getenv("OPENAI_API_KEY", "")

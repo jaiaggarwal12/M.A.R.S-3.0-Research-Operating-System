@@ -11,6 +11,9 @@ def get_llm(temperature: float | None = None) -> BaseChatModel:
     if p == "anthropic":
         from langchain_anthropic import ChatAnthropic
         return ChatAnthropic(model=config.ANTHROPIC_MODEL, temperature=t, api_key=config.ANTHROPIC_API_KEY)
+    if p == "groq":
+        from langchain_groq import ChatGroq
+        return ChatGroq(model=config.GROQ_MODEL, temperature=t, api_key=config.GROQ_API_KEY)
     if p == "ollama":
         from langchain_community.chat_models import ChatOllama
         return ChatOllama(model=config.OLLAMA_MODEL, base_url=config.OLLAMA_BASE_URL, temperature=t)
