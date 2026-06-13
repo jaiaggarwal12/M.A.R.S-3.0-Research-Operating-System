@@ -1,0 +1,68 @@
+# ── Agent orchestration ────────────────────────────────────────────────────
+langgraph>=0.2.0
+langchain>=0.3.0
+langchain-community>=0.3.0
+langchain-core>=0.3.0
+langchain-openai>=0.2.0
+langchain-anthropic>=0.2.0
+
+# ── Vector store & embeddings ──────────────────────────────────────────────
+faiss-cpu>=1.8.0
+sentence-transformers>=3.0.0
+
+# ── Graph database ─────────────────────────────────────────────────────────
+neo4j>=5.20.0
+networkx>=3.3
+
+# ── Persistent memory (Research Memory DB) ────────────────────────────────
+tinydb>=4.8.0            # Lightweight JSON DB — zero config, no server needed
+sqlite-utils>=3.36       # SQLite for structured experiment history
+
+# ── Paper ingestion ────────────────────────────────────────────────────────
+arxiv>=2.1.0
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+pypdf>=4.0.0
+semanticscholar>=0.8.0
+
+# ── Code generation & sandboxing ──────────────────────────────────────────
+docker>=7.0.0
+autopep8>=2.1.0
+black>=24.0.0
+
+# ── API & serving ──────────────────────────────────────────────────────────
+fastapi>=0.115.0
+uvicorn>=0.30.0
+pydantic>=2.7.0
+python-dotenv>=1.0.0
+websockets>=12.0
+
+# ── Data & metrics ─────────────────────────────────────────────────────────
+numpy>=1.26.0
+pandas>=2.2.0
+scipy>=1.13.0
+scikit-learn>=1.5.0
+matplotlib>=3.9.0
+plotly>=5.22.0
+
+# ── Frontend ───────────────────────────────────────────────────────────────
+gradio>=4.40.0
+
+# ── Testing ────────────────────────────────────────────────────────────────
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+
+# ── Logging & monitoring ───────────────────────────────────────────────────
+loguru>=0.7.0
+rich>=13.7.0
+prometheus-client>=0.20.0
+
+# ── Distributed execution ────────────────────────────────────────────────────
+modal>=0.62.0          # Modal.com serverless GPU — pip install modal
+runpod>=1.6.0          # RunPod API client — pip install runpod
+kaggle>=1.6.0          # Kaggle Notebooks API — pip install kaggle
+nbformat>=5.9.0        # Notebook builder for Kaggle
+
+# ── Corpus building ──────────────────────────────────────────────────────────
+# semanticscholar already in requirements
+# arxiv already in requirements
