@@ -33,11 +33,11 @@ pipeline: Optional[MARSPipeline] = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global pipeline
-    logger.info("Booting M.A.R.S 3.0...")
-    pipeline = MARSPipeline()
-    logger.info("Ready")
+    # Do NOT init pipeline at startup — too heavy for free tier RAM.
+    # It lazy-inits on the first /research request.
+    logger.info("M.A.R.S 4.0 API starting (pipeline lazy-init on first request)")
     yield
+    global pipeline
     if pipeline:
         pipeline.close()
 
@@ -79,6 +79,16 @@ async def health():
     return {"status": "ok", "version": "3.0.0"}
 
 
+def _get_pipeline() -> MARSPipeline:
+    """Lazy-init pipeline on first request — keeps startup RAM under 512MB."""
+    global pipeline
+    if pipeline is None:
+        logger.info("Initializing M.A.R.S pipeline (first request)...")
+        pipeline = MARSPipeline()
+        logger.info("Pipeline ready")
+    return pipeline
+
+
 @app.get("/metrics")
 async def get_metrics():
     """Live benchmark snapshot — real numbers."""
@@ -87,10 +97,9 @@ async def get_metrics():
 
 @app.post("/research")
 async def run_research(req: ResearchRequest):
-    if not pipeline:
-        raise HTTPException(503, "Pipeline not ready")
     try:
-        result = pipeline.run(
+        p = _get_pipeline()
+        result = p.run(
             req.query, req.domain or "",
             run_experiments=req.run_experiments,
             twin_persona=req.twin_persona,
@@ -120,10 +129,9 @@ async def run_research(req: ResearchRequest):
 
 @app.post("/research/quick")
 async def run_quick(query: str):
-    if not pipeline:
-        raise HTTPException(503, "Pipeline not ready")
     try:
-        result = pipeline.run(query, run_experiments=False)
+        p = _get_pipeline()
+        result = p.run(query, run_experiments=False)
         return {
             "query": query,
             "literature_summary": result.get("literature_summary", ""),
@@ -138,38 +146,34 @@ async def run_quick(query: str):
 @app.get("/memory")
 async def get_memory(domain: str = "", limit: int = 50):
     """Browse Research Memory DB."""
-    if not pipeline:
-        raise HTTPException(503, "Pipeline not ready")
-    all_entries = pipeline.memory.all_entries()
+    p = _get_pipeline()
+    all_entries = p.memory.all_entries()
     if domain:
         all_entries = [e for e in all_entries if domain.lower() in e.get("domain","").lower()]
     return {
-        "total": pipeline.memory.total(),
+        "total": p.memory.total(),
         "entries": all_entries[:limit],
-        "successful": len(pipeline.memory.get_successful_discoveries()),
-        "failed": len(pipeline.memory.get_failed_hypotheses()),
+        "successful": len(p.memory.get_successful_discoveries()),
+        "failed": len(p.memory.get_failed_hypotheses()),
     }
 
 
 @app.get("/graph/network")
 async def graph_network(max_nodes: int = 120):
-    if not pipeline:
-        raise HTTPException(503, "Pipeline not ready")
-    return pipeline.kg.get_citation_network_json(max_nodes=max_nodes)
+    p = _get_pipeline()
+    return p.kg.get_citation_network_json(max_nodes=max_nodes)
 
 
 @app.get("/graph/clusters")
 async def graph_clusters():
-    if not pipeline:
-        raise HTTPException(503, "Pipeline not ready")
-    return {"clusters": pipeline.kg.detect_research_clusters()}
+    p = _get_pipeline()
+    return {"clusters": p.kg.detect_research_clusters()}
 
 
 @app.get("/graph/gaps")
 async def graph_gaps():
-    if not pipeline:
-        raise HTTPException(503, "Pipeline not ready")
-    return {"gaps": pipeline.kg.detect_gaps()}
+    p = _get_pipeline()
+    return {"gaps": p.kg.detect_gaps()}
 
 
 @app.get("/experiments")
@@ -206,10 +210,9 @@ async def experiment_files(exp_id: str):
 
 @app.post("/twin/build")
 async def build_twin(req: TwinBuildRequest):
-    if not pipeline:
-        raise HTTPException(503, "Pipeline not ready")
     try:
-        persona = pipeline.twin.build_persona(req.name, req.papers)
+        p = _get_pipeline()
+        persona = p.twin.build_persona(req.name, req.papers)
         return {"status": "ok", "persona": persona}
     except Exception as exc:
         raise HTTPException(500, str(exc))
@@ -217,12 +220,10 @@ async def build_twin(req: TwinBuildRequest):
 
 @app.post("/twin/generate")
 async def generate_twin(req: TwinGenerateRequest):
-    if not pipeline:
-        raise HTTPException(503, "Pipeline not ready")
-    # Auto-load famous persona if not built
-    if req.persona_name not in pipeline.twin.list_personas():
-        pipeline.twin.load_famous_persona(req.persona_name)
-    result = pipeline.twin.generate_twin_hypothesis(
+    p = _get_pipeline()
+    if req.persona_name not in p.twin.list_personas():
+        p.twin.load_famous_persona(req.persona_name)
+    result = p.twin.generate_twin_hypothesis(
         req.persona_name, req.domain, req.research_gaps
     )
     return result
@@ -230,9 +231,8 @@ async def generate_twin(req: TwinGenerateRequest):
 
 @app.get("/twin/personas")
 async def list_personas():
-    if not pipeline:
-        raise HTTPException(503, "Pipeline not ready")
-    return {"personas": pipeline.twin.list_personas()}
+    p = _get_pipeline()
+    return {"personas": p.twin.list_personas()}
 
 
 if __name__ == "__main__":

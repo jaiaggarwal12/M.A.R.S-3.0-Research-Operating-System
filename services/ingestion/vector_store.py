@@ -3,7 +3,6 @@ import pickle
 from pathlib import Path
 from typing import List, Tuple
 import numpy as np
-from sentence_transformers import SentenceTransformer
 from core.logger import logger
 from core import config
 from services.ingestion.arxiv_client import PaperRecord
@@ -19,19 +18,30 @@ class VectorStore:
         self.index_path.mkdir(parents=True, exist_ok=True)
         self._fi = self.index_path / "index.faiss"
         self._fm = self.index_path / "meta.pkl"
-        self._model = SentenceTransformer(model_name)
-        self._dim = self._model.get_sentence_embedding_dimension()
+        self._model_name = model_name
+        self._model = None          # lazy — loaded on first encode
+        self._dim = None
         self._index = None
         self._meta: List[dict] = []
         if self._fi.exists() and self._fm.exists():
             self._load()
 
+    # ── lazy model loader ────────────────────────────────────
+    def _get_model(self):
+        if self._model is None:
+            from sentence_transformers import SentenceTransformer
+            logger.info(f"[VectorStore] Loading embedding model {self._model_name}...")
+            self._model = SentenceTransformer(self._model_name)
+            self._dim = self._model.get_sentence_embedding_dimension()
+        return self._model
+
     def add_papers(self, papers: List[PaperRecord]) -> int:
         existing = {m["arxiv_id"] for m in self._meta}
         new = [p for p in papers if p.arxiv_id not in existing]
         if not new: return 0
-        embs = self._model.encode([f"{p.title}. {p.abstract}" for p in new],
-            batch_size=32, show_progress_bar=True, normalize_embeddings=True).astype("float32")
+        model = self._get_model()
+        embs = model.encode([f"{p.title}. {p.abstract}" for p in new],
+            batch_size=32, show_progress_bar=False, normalize_embeddings=True).astype("float32")
         if self._index is None:
             self._index = faiss.IndexFlatIP(self._dim) if _FAISS else _NumpyIndex(self._dim)
         self._index.add(embs)
@@ -40,7 +50,8 @@ class VectorStore:
 
     def search(self, query: str, k: int = 10) -> List[Tuple[dict, float]]:
         if not self._meta: return []
-        q = self._model.encode([query], normalize_embeddings=True).astype("float32")
+        model = self._get_model()
+        q = model.encode([query], normalize_embeddings=True).astype("float32")
         k = min(k, len(self._meta))
         d, i = self._index.search(q, k)
         return [(self._meta[idx], float(sc)) for sc, idx in zip(d[0], i[0]) if idx >= 0]
