@@ -8,7 +8,7 @@ from core.llm import get_llm
 from core.logger import logger
 from core import config
 
-QPROMPT = "Generate 3 targeted Arxiv search queries for this topic. Return ONLY JSON array of strings. Exactly 3 queries."
+QPROMPT = "Generate 3 highly specific Arxiv search queries for this exact research topic. Each query must directly relate to the core topic — do NOT generate tangential or loosely related queries. Return ONLY a JSON array of 3 strings."
 ROUTER = "Classify retrieval: graph|vector|hybrid. ONE word only."
 LIT_PROMPT = "Write concise literature review (<400 words). Cover themes, key papers, evolution, benchmarks."
 LOOP_PROMPT = """Given experiment results, decide: run another loop?

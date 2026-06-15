@@ -58,8 +58,9 @@ class ExperimentDesigner:
     def design_experiments(self, hypotheses: List[dict], domain: str) -> List[dict]:
         plans = []
         for hyp in hypotheses[:3]:
-            # Skip no-go hypotheses from debate
-            if hyp.get("debate_verdict") == "no-go":
+            # Only skip hard no-go — conditional and go both proceed
+            verdict = hyp.get("debate_verdict", "go").lower()
+            if verdict == "no-go":
                 logger.info(f"[Designer] Skipping no-go: {hyp.get('title','?')}")
                 continue
             logger.info(f"[Designer] Designing: {hyp.get('title','?')}")
