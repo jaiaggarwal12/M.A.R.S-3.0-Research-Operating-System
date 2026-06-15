@@ -8,7 +8,7 @@ from core.llm import get_llm
 from core.logger import logger
 from core import config
 
-QPROMPT = "Generate 4-6 targeted Arxiv search queries for this topic. Return ONLY JSON array of strings."
+QPROMPT = "Generate 3 targeted Arxiv search queries for this topic. Return ONLY JSON array of strings. Exactly 3 queries."
 ROUTER = "Classify retrieval: graph|vector|hybrid. ONE word only."
 LIT_PROMPT = "Write concise literature review (<400 words). Cover themes, key papers, evolution, benchmarks."
 LOOP_PROMPT = """Given experiment results, decide: run another loop?
@@ -24,6 +24,7 @@ def make_ingest_node(arxiv_client, vector_store):
             queries = json.loads(raw)
             if not isinstance(queries, list): queries = [query]
         except: queries = [query]
+        queries = queries[:3]  # Cap at 3 queries max for speed
         papers = arxiv_client.fetch(queries)
         vector_store.add_papers(papers)
         return {**state, "papers":[p.to_dict() for p in papers],

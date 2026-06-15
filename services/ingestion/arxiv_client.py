@@ -34,9 +34,9 @@ class PaperRecord:
 
 class ArxivClient:
     def __init__(self, max_per_query=config.MAX_PAPERS_PER_QUERY, max_age_days=config.MAX_PAPER_AGE_DAYS):
-        self.max_per_query = max_per_query
+        self.max_per_query = min(max_per_query, 15)  # Cap at 15 for speed on cloud
         self.max_age_days = max_age_days
-        self._client = arxiv.Client(page_size=50, delay_seconds=3.0, num_retries=3)
+        self._client = arxiv.Client(page_size=20, delay_seconds=1.0, num_retries=2)
 
     def fetch(self, queries: List[str]) -> List[PaperRecord]:
         seen, papers = set(), []
@@ -55,7 +55,7 @@ class ArxivClient:
                     papers.append(self._to_record(r))
             except Exception as exc:
                 logger.warning(f"[Ingestion] Arxiv error: {exc}")
-            time.sleep(1)
+            time.sleep(0.5)
 
         if config.FETCH_CITATIONS and config.SEMANTIC_SCHOLAR_API_KEY:
             papers = self._enrich(papers)
