@@ -7,9 +7,8 @@ langchain-openai>=0.2.0
 langchain-anthropic>=0.2.0
 langchain-groq>=0.2.0
 
-# ── Vector store & embeddings ──────────────────────────────────────────────
-faiss-cpu>=1.8.0
-sentence-transformers>=3.0.0
+# ── Vector store & embeddings (TF-IDF based — no GPU/large model needed) ───
+scikit-learn>=1.5.0
 
 # ── Graph database ─────────────────────────────────────────────────────────
 neo4j>=5.20.0
@@ -26,8 +25,7 @@ beautifulsoup4>=4.12.0
 pypdf>=4.0.0
 semanticscholar>=0.8.0
 
-# ── Code generation & sandboxing ──────────────────────────────────────────
-docker>=7.0.0
+# ── Code generation & formatting ──────────────────────────────────────────
 autopep8>=2.1.0
 black>=24.0.0
 
@@ -42,8 +40,6 @@ websockets>=12.0
 numpy>=1.26.0
 pandas>=2.2.0
 scipy>=1.13.0
-scikit-learn>=1.5.0
-matplotlib>=3.9.0
 plotly>=5.22.0
 
 # ── Frontend ───────────────────────────────────────────────────────────────
@@ -58,11 +54,11 @@ loguru>=0.7.0
 rich>=13.7.0
 prometheus-client>=0.20.0
 
-# ── Distributed execution ────────────────────────────────────────────────────
-modal>=0.62.0          # Modal.com serverless GPU — pip install modal
-runpod>=1.6.0          # RunPod API client — pip install runpod
-kaggle>=1.6.0          # Kaggle Notebooks API — pip install kaggle
-nbformat>=5.9.0        # Notebook builder for Kaggle
+# ── Distributed execution (optional — comment out for lightweight deploy) ─────
+# modal>=0.62.0
+# runpod>=1.6.0
+# kaggle>=1.6.0
+nbformat>=5.9.0
 
 # ── Corpus building ──────────────────────────────────────────────────────────
 # semanticscholar already in requirements
