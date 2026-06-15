@@ -21,7 +21,7 @@ Return JSON: {"continue": true|false, "reasoning": "...", "next_focus": "refined
 def make_ingest_node(arxiv_client, vector_store):
     def ingest(state):
         query = state["query"]
-        # Use the query directly as the first search term — guaranteed on-topic
+        # Always use the raw query as first search — guaranteed on-topic
         direct_queries = [query]
         llm = get_llm(temperature=0.1)
         resp = llm.invoke([SystemMessage(content=QPROMPT), HumanMessage(content=f"Topic: {query}")])
@@ -29,7 +29,6 @@ def make_ingest_node(arxiv_client, vector_store):
             raw = resp.content.strip().replace("```json","").replace("```","")
             llm_queries = json.loads(raw)
             if isinstance(llm_queries, list):
-                # Only keep queries that share at least one word with the topic
                 topic_words = set(query.lower().split())
                 filtered = [q for q in llm_queries
                             if any(w in q.lower() for w in topic_words if len(w) > 3)]
@@ -38,6 +37,10 @@ def make_ingest_node(arxiv_client, vector_store):
             pass
         queries = direct_queries[:3]
         logger.info(f"[Ingest] Queries: {queries}")
+        # Clear old cached papers so fresh topic-relevant papers are fetched
+        vector_store._meta = []
+        vector_store._tfidf = None
+        vector_store._tfidf_matrix = None
         papers = arxiv_client.fetch(queries)
         vector_store.add_papers(papers)
         return {**state, "papers":[p.to_dict() for p in papers],

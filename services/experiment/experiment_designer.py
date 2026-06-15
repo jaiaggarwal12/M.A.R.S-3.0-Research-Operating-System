@@ -58,16 +58,17 @@ class ExperimentDesigner:
     def design_experiments(self, hypotheses: List[dict], domain: str) -> List[dict]:
         plans = []
         for hyp in hypotheses[:3]:
-            # Only skip hard no-go — conditional and go both proceed
-            verdict = hyp.get("debate_verdict", "go").lower()
+            # Only hard skip if explicitly marked no-go
+            verdict = str(hyp.get("debate_verdict", "go")).lower().strip()
             if verdict == "no-go":
                 logger.info(f"[Designer] Skipping no-go: {hyp.get('title','?')}")
                 continue
-            logger.info(f"[Designer] Designing: {hyp.get('title','?')}")
+            logger.info(f"[Designer] Designing: {hyp.get('title','?')} (verdict={verdict})")
             plan = self._design_one(hyp, domain)
             if plan:
                 plans.append(plan)
         metrics.inc("experiments_designed", len(plans))
+        logger.info(f"[Designer] {len(plans)} plans designed from {len(hypotheses)} hypotheses")
         return plans
 
     def _design_one(self, hypothesis: dict, domain: str) -> dict | None:
