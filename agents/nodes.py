@@ -8,7 +8,11 @@ from core.llm import get_llm
 from core.logger import logger
 from core import config
 
-QPROMPT = "Generate 3 highly specific Arxiv search queries for this exact research topic. Each query must directly relate to the core topic — do NOT generate tangential or loosely related queries. Return ONLY a JSON array of 3 strings."
+QPROMPT = """Generate exactly 3 Arxiv search queries for the topic below.
+Rules: each query MUST contain keywords from the topic. No tangential topics.
+Example for "speculative decoding LLM inference": 
+["speculative decoding language model inference", "draft model verification LLM speed", "token prediction parallelism transformer inference"]
+Return ONLY a JSON array of 3 strings, no explanation."""
 ROUTER = "Classify retrieval: graph|vector|hybrid. ONE word only."
 LIT_PROMPT = "Write concise literature review (<400 words). Cover themes, key papers, evolution, benchmarks."
 LOOP_PROMPT = """Given experiment results, decide: run another loop?
@@ -17,14 +21,23 @@ Return JSON: {"continue": true|false, "reasoning": "...", "next_focus": "refined
 def make_ingest_node(arxiv_client, vector_store):
     def ingest(state):
         query = state["query"]
-        llm = get_llm(temperature=0.2)
+        # Use the query directly as the first search term — guaranteed on-topic
+        direct_queries = [query]
+        llm = get_llm(temperature=0.1)
         resp = llm.invoke([SystemMessage(content=QPROMPT), HumanMessage(content=f"Topic: {query}")])
         try:
             raw = resp.content.strip().replace("```json","").replace("```","")
-            queries = json.loads(raw)
-            if not isinstance(queries, list): queries = [query]
-        except: queries = [query]
-        queries = queries[:3]  # Cap at 3 queries max for speed
+            llm_queries = json.loads(raw)
+            if isinstance(llm_queries, list):
+                # Only keep queries that share at least one word with the topic
+                topic_words = set(query.lower().split())
+                filtered = [q for q in llm_queries
+                            if any(w in q.lower() for w in topic_words if len(w) > 3)]
+                direct_queries += filtered[:2]
+        except:
+            pass
+        queries = direct_queries[:3]
+        logger.info(f"[Ingest] Queries: {queries}")
         papers = arxiv_client.fetch(queries)
         vector_store.add_papers(papers)
         return {**state, "papers":[p.to_dict() for p in papers],
@@ -102,7 +115,8 @@ def make_hypothesis_node(hyp_gen, reasoner):
             graph_gaps=state.get("_graph_gaps",[]),
             influential_papers=state.get("influential_papers",[]),
             key_papers=state.get("key_papers",[]),
-            memory_context=mem_ctx)
+            memory_context=mem_ctx,
+            query=state.get("query",""))  # pass query for fallback
         standard_hyps = result.get("hypotheses",[])
         cp_hyps = reasoner.combinations_to_hypotheses(state.get("cross_paper_combinations",[]))
         all_hyps = standard_hyps + cp_hyps
