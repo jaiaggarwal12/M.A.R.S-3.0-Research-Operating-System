@@ -98,6 +98,7 @@ class HypothesisGenerator:
 
     @staticmethod
     def _parse(raw, default):
+        import re
         raw = raw.strip()
         if "```" in raw:
             for part in raw.split("```"):
@@ -107,4 +108,13 @@ class HypothesisGenerator:
         try:
             return json.loads(raw)
         except:
-            return default
+            pass
+        # Extract first JSON array or object even if wrapped in text
+        for pattern in (r'\[[\s\S]*\]', r'\{[\s\S]*\}'):
+            m = re.search(pattern, raw)
+            if m:
+                try:
+                    return json.loads(m.group())
+                except:
+                    continue
+        return default

@@ -46,9 +46,9 @@ class ArxivClient:
             try:
                 for r in self._client.results(arxiv.Search(
                     query=query, max_results=self.max_per_query,
-                    sort_by=arxiv.SortCriterion.SubmittedDate,
+                    sort_by=arxiv.SortCriterion.Relevance,
                     sort_order=arxiv.SortOrder.Descending)):
-                    if r.published < cutoff: continue
+                    # Relevance sort — keep all matches (no date cutoff filter)
                     aid = r.get_short_id()
                     if aid in seen: continue
                     seen.add(aid)

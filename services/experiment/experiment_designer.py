@@ -18,36 +18,22 @@ from core.logger import logger
 from core import config, metrics
 
 
-DESIGN_PROMPT = """You are an expert ML engineer creating a complete, reproducible experiment.
+DESIGN_PROMPT = """You are an expert ML engineer designing an experiment to test a hypothesis.
 
-Given a hypothesis, generate a COMPLETE experiment package.
-
-Return JSON with these EXACT keys:
+Return ONLY a compact JSON object with these keys (no code, just metadata):
 {
-  "title": "experiment name",
-  "hypothesis": "tested claim",
-  "methodology": ["step1", "step2", "step3"],
+  "title": "short experiment name",
+  "hypothesis": "the claim being tested",
+  "methodology": ["step 1", "step 2", "step 3"],
   "baselines": ["baseline1", "baseline2"],
   "metrics": ["accuracy", "f1"],
   "datasets": ["dataset name"],
-  "estimated_compute": "~X GPU hours on T4",
+  "estimated_compute": "~X minutes on CPU/GPU",
   "difficulty": "low|medium|high",
-  "novelty": "what makes this new",
-
-  "train_py": "COMPLETE runnable Python. Must: use argparse, log METRIC:<name>:<value> lines, save results.json",
-  "eval_py": "COMPLETE eval script that loads saved model and reports metrics",
-  "config_yaml": "COMPLETE yaml config with all hyperparameters",
-  "requirements_txt": "exact pip packages, one per line",
-  "dockerfile": "complete Dockerfile FROM python:3.11-slim",
-  "readme_md": "## How to run\\n```bash\\npip install -r requirements.txt\\npython train.py\\n```"
+  "novelty": "one sentence on what is new"
 }
 
-The train.py MUST:
-1. Be fully runnable with standard packages only
-2. Print lines like: METRIC:accuracy:0.923
-3. Save final metrics to results.json
-4. Include a simple baseline comparison
-Return ONLY valid JSON."""
+Keep it concise. Return ONLY valid JSON, no markdown, no code."""
 
 
 class ExperimentDesigner:
@@ -79,7 +65,21 @@ class ExperimentDesigner:
         ])
 
         plan = self._parse(resp.content)
-        if not plan: return None
+        # NEVER fail — if the LLM couldn't return valid JSON, build a minimal plan
+        # from the hypothesis itself. The fallback code templates guarantee runnability.
+        if not plan:
+            logger.warning("[Designer] LLM JSON parse failed — using metadata fallback")
+            plan = {
+                "title": hypothesis.get("title", "Experiment"),
+                "hypothesis": hypothesis.get("statement", hypothesis.get("title", "")),
+                "methodology": ["Generate synthetic dataset", "Train baseline", "Train proposed model", "Compare metrics"],
+                "baselines": hypothesis.get("required_baselines", ["logistic_regression"]),
+                "metrics": hypothesis.get("evaluation_metrics", ["accuracy", "f1"]),
+                "datasets": ["synthetic"],
+                "estimated_compute": "~minutes on CPU",
+                "difficulty": "low",
+                "novelty": hypothesis.get("title", ""),
+            }
 
         exp_id = self._make_id(plan.get("title","experiment"))
         plan["experiment_id"] = exp_id
@@ -96,17 +96,11 @@ class ExperimentDesigner:
         d = self.experiments_dir / exp_id
         d.mkdir(parents=True, exist_ok=True)
 
-        # train.py
-        train_code = plan.get("train_py","")
-        if not train_code:
-            train_code = self._fallback_train_py(plan)
-        (d/"train.py").write_text(train_code)
+        # train.py — always use the proven runnable template (LLM code is unreliable)
+        (d/"train.py").write_text(self._fallback_train_py(plan))
 
-        # eval.py
-        eval_code = plan.get("eval_py","")
-        if not eval_code:
-            eval_code = self._fallback_eval_py(plan)
-        (d/"eval.py").write_text(eval_code)
+        # eval.py — always use the proven runnable template
+        (d/"eval.py").write_text(self._fallback_eval_py(plan))
 
         # config.yaml
         cfg = plan.get("config_yaml","") or self._fallback_config(plan)
@@ -143,7 +137,7 @@ class ExperimentDesigner:
             if m:
                 try: return json.loads(m.group())
                 except: pass
-            return None
+            return None  # caller builds a fallback plan
 
     @staticmethod
     def _make_id(title: str) -> str:
