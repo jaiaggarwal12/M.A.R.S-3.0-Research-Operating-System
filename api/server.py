@@ -176,6 +176,16 @@ async def graph_gaps():
     return {"gaps": p.kg.detect_gaps()}
 
 
+@app.get("/arena")
+async def arena_leaderboard(top_n: int = 30):
+    """All-time ranked hypothesis leaderboard."""
+    p = _get_pipeline()
+    return {
+        "entries": p.arena.get_leaderboard(top_n=top_n),
+        "stats": p.arena.get_arena_stats(),
+    }
+
+
 @app.get("/experiments")
 async def list_experiments():
     exp_dir = config.EXPERIMENTS_DIR
