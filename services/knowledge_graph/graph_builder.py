@@ -37,6 +37,10 @@ class KnowledgeGraphBuilder:
                 authors=p.authors, citation_count=p.citation_count)
             for ref in p.references:
                 if ref: self._nx.add_edge(p.arxiv_id, ref, rel="CITES")
+        # If very few citation edges, add similarity-based edges so the graph
+        # is actually connected and visualizes meaningfully
+        if self._nx.number_of_edges() < len(papers) // 2:
+            self._add_similarity_edges(papers)
         if self._driver:
             with self._driver.session(database=self._db) as s:
                 for p in papers: s.execute_write(self._upsert_tx, p)
@@ -44,6 +48,33 @@ class KnowledgeGraphBuilder:
         metrics.inc("graph_nodes", stats["nodes"])
         metrics.inc("graph_edges", stats["edges"])
         return stats
+
+    def _add_similarity_edges(self, papers: List[PaperRecord]):
+        """Add edges between papers with overlapping categories or high keyword overlap."""
+        from itertools import combinations as combos
+        ids = [p.arxiv_id for p in papers]
+        # Category-based: if two papers share a category, connect them
+        for a, b in combos(ids, 2):
+            pa = self._papers.get(a, {})
+            pb = self._papers.get(b, {})
+            cats_a = set(pa.get("categories", []))
+            cats_b = set(pb.get("categories", []))
+            shared = cats_a & cats_b
+            if shared:
+                self._nx.add_edge(a, b, rel="SIMILAR_TOPIC", weight=len(shared))
+        # Keyword-based: if title words overlap significantly, connect
+        for a, b in combos(ids, 2):
+            if self._nx.has_edge(a, b):
+                continue
+            ta = set(self._papers.get(a, {}).get("title", "").lower().split())
+            tb = set(self._papers.get(b, {}).get("title", "").lower().split())
+            # Remove short/common words
+            stop = {"a","an","the","of","for","in","on","to","and","with","from","by","is","are","via"}
+            ta -= stop
+            tb -= stop
+            overlap = ta & tb
+            if len(overlap) >= 2:
+                self._nx.add_edge(a, b, rel="KEYWORD_OVERLAP", weight=len(overlap))
 
     def get_influential_papers(self, top_n=10) -> List[dict]:
         if not self._nx.nodes: return []

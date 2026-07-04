@@ -97,22 +97,50 @@ def get_graph_viz():
 def get_research_tree_viz():
     try:
         p = get_p()
-        tree = p.warehouse.get_research_tree()
         nodes_flat = p.warehouse.get_flat_list()
         if not nodes_flat:
             fig=go.Figure(); fig.add_annotation(text="No experiments yet. Run a query first.", xref="paper",yref="paper",x=0.5,y=0.5,showarrow=False,font=dict(size=16)); return fig
-        labels=[n["title"][:40] for n in nodes_flat]
-        parents=[n.get("parent_id","") or "" for n in nodes_flat]
-        ids=[n["node_id"] for n in nodes_flat]
-        colors={"success":"#22c55e","failed":"#ef4444","inconclusive":"#f59e0b","designed":"#3b82f6","running":"#a855f7"}
-        node_colors=[colors.get(n.get("status",""),"#6b7280") for n in nodes_flat]
+
+        # Build a proper tree: Root → each experiment as a child
+        # If nodes have parent_id pointing to another node, respect that.
+        # Otherwise, put them under a "Research" root.
+        ROOT_ID = "__root__"
+        ids = [ROOT_ID]
+        labels = ["🔬 Research"]
+        parents = [""]
+        node_colors = ["#1e1e2e"]
+
+        status_colors = {"success":"#22c55e","confirmed":"#22c55e","failed":"#ef4444",
+                        "inconclusive":"#f59e0b","designed":"#3b82f6","running":"#a855f7"}
+        node_id_set = {n["node_id"] for n in nodes_flat}
+
+        for n in nodes_flat:
+            ids.append(n["node_id"])
+            status = n.get("status","") or n.get("hypothesis_verdict","")
+            emoji = {"success":"✅","confirmed":"✅","failed":"❌","inconclusive":"⚠️","designed":"📐"}.get(status,"🧪")
+            labels.append(f"{emoji} {n['title'][:35]}")
+            # Parent: use parent_id if it exists in our set, else root
+            pid = n.get("parent_id","")
+            if pid and pid in node_id_set:
+                parents.append(pid)
+            else:
+                parents.append(ROOT_ID)
+            node_colors.append(status_colors.get(status,"#6b7280"))
+
         fig = go.Figure(go.Treemap(
             ids=ids, labels=labels, parents=parents,
-            marker=dict(colors=node_colors),
-            hovertemplate="<b>%{label}</b><br>Status: %{customdata}<extra></extra>",
-            customdata=[n.get("status","") for n in nodes_flat]))
-        fig.update_layout(title="Research Experiment Tree", height=600,
-            margin=dict(l=0,r=0,t=40,b=0))
+            marker=dict(colors=node_colors, line=dict(width=1, color="#2a2a3a")),
+            hovertemplate="<b>%{label}</b><extra></extra>",
+            textinfo="label",
+            textfont=dict(size=12, color="white"),
+        ))
+        fig.update_layout(
+            title="Research Experiment Tree",
+            height=500,
+            margin=dict(l=5,r=5,t=40,b=5),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+        )
         return fig
     except Exception as exc:
         fig=go.Figure(); fig.add_annotation(text=f"Error: {exc}",xref="paper",yref="paper",x=0.5,y=0.5,showarrow=False); return fig
